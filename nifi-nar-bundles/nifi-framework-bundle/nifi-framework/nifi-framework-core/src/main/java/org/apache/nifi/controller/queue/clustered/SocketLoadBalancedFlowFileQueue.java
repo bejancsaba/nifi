@@ -725,6 +725,7 @@ public class SocketLoadBalancedFlowFileQueue extends AbstractFlowFileQueue imple
         putAndGetPartition(flowFile);
     }
 
+
     protected QueuePartition putAndGetPartition(final FlowFileRecord flowFile) {
         final QueuePartition partition;
 
@@ -1140,6 +1141,11 @@ public class SocketLoadBalancedFlowFileQueue extends AbstractFlowFileQueue imple
                 partitionWriteLock.unlock();
             }
         }
+    }
+
+    @Override
+    public String toString() {
+        return "FlowFileQueue[id=" + getIdentifier() + ", Load Balance Strategy=" + getLoadBalanceStrategy() + ", size=" + size() + "]";
     }
 }
 
