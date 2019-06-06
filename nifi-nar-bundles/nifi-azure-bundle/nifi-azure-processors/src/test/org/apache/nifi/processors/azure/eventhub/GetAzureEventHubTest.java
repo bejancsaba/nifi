@@ -19,19 +19,25 @@ package org.apache.nifi.processors.azure.eventhub;
 import com.microsoft.azure.eventhubs.EventData;
 import com.microsoft.azure.eventhubs.PartitionReceiver;
 import com.microsoft.azure.servicebus.ServiceBusException;
+import com.microsoft.azure.servicebus.amqp.AmqpConstants;
+
+import java.io.IOException;
+import java.lang.reflect.Field;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.concurrent.ExecutionException;
+
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.nifi.processor.ProcessContext;
 import org.apache.nifi.processor.exception.ProcessException;
 import org.apache.nifi.util.TestRunner;
 import org.apache.nifi.util.TestRunners;
 import org.junit.Before;
 import org.junit.Test;
-import org.powermock.reflect.Whitebox;
-
-import java.io.IOException;
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
-import java.util.LinkedList;
-import java.util.concurrent.ExecutionException;
 
 
 public class GetAzureEventHubTest {
@@ -140,12 +146,22 @@ public class GetAzureEventHubTest {
             }
             final LinkedList<EventData> receivedEvents = new LinkedList<>();
             for(int i = 0; i < 10; i++){
-                final EventData eventData = new EventData(String.format("test event number: %d",i).getBytes());
-                Whitebox.setInternalState(eventData,"isReceivedEvent",true);
-                Whitebox.setInternalState(eventData, "partitionKey","0");
-                Whitebox.setInternalState(eventData, "offset", "100");
-                Whitebox.setInternalState(eventData, "sequenceNumber",13L);
-                Whitebox.setInternalState(eventData, "enqueuedTime",Instant.now().minus(100L, ChronoUnit.SECONDS));
+                EventData eventData = new EventData(String.format("test event number: %d", i).getBytes());
+                if (received) {
+                    HashMap<String, Object> properties = new HashMap<>();
+                    properties.put(AmqpConstants.PARTITION_KEY_ANNOTATION_NAME, PARTITION_KEY_VALUE);
+                    properties.put(AmqpConstants.OFFSET_ANNOTATION_NAME, OFFSET_VALUE);
+                    properties.put(AmqpConstants.SEQUENCE_NUMBER_ANNOTATION_NAME, SEQUENCE_NUMBER_VALUE);
+                    properties.put(AmqpConstants.ENQUEUED_TIME_UTC_ANNOTATION_NAME, ENQUEUED_TIME_VALUE);
+
+                    SystemProperties systemProperties = new SystemProperties(properties);
+                    Field systemPropertiesField = FieldUtils.getDeclaredField(EventData.class, "systemProperties", true);
+                    try {
+                        systemPropertiesField.set(eventData, systemProperties);
+                    } catch (IllegalAccessException e) {
+                        throw new ProcessException("Could not set systemProperties on EventData", e);
+                    }
+                }
                 receivedEvents.add(eventData);
             }
 
