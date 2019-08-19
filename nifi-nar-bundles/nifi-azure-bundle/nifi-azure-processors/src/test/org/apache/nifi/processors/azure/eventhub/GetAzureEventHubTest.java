@@ -18,7 +18,19 @@ package org.apache.nifi.processors.azure.eventhub;
 
 import com.microsoft.azure.eventhubs.EventData;
 import com.microsoft.azure.eventhubs.PartitionReceiver;
-import com.microsoft.azure.servicebus.ServiceBusException;
+import com.microsoft.azure.eventhubs.EventHubException;
+import com.microsoft.azure.eventhubs.impl.AmqpConstants;
+
+import java.io.IOException;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ScheduledExecutorService;
+
 import org.apache.nifi.processor.ProcessContext;
 import org.apache.nifi.processor.exception.ProcessException;
 import org.apache.nifi.util.TestRunner;
@@ -33,9 +45,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.LinkedList;
 import java.util.concurrent.ExecutionException;
 
-
 public class GetAzureEventHubTest {
-
     private static final String namespaceName = "nifi-azure-hub";
     private static final String eventHubName = "get-test";
     private static final String sasKeyName = "bogus-policy";
@@ -69,7 +79,7 @@ public class GetAzureEventHubTest {
         testRunner.setProperty(GetAzureEventHub.RECEIVER_FETCH_TIMEOUT,"10000");
         testRunner.assertValid();
     }
-    
+
     @Test
     public void verifyRelationships(){
 
@@ -119,11 +129,11 @@ public class GetAzureEventHubTest {
         boolean getReceiverThrow = false;
 
         @Override
-        protected void setupReceiver(final String connectionString) throws ProcessException{
+        protected void setupReceiver(final String connectionString, final ScheduledExecutorService executor) throws ProcessException{
             //do nothing
         }
         @Override
-        protected PartitionReceiver getReceiver(final ProcessContext context, final String partitionId) throws IOException, ServiceBusException, ExecutionException, InterruptedException {
+        protected PartitionReceiver getReceiver(final ProcessContext context, final String partitionId) throws IOException, EventHubException, ExecutionException, InterruptedException {
             if(getReceiverThrow){
                 throw new IOException("Could not create receiver");
             }
@@ -140,25 +150,27 @@ public class GetAzureEventHubTest {
             }
             final LinkedList<EventData> receivedEvents = new LinkedList<>();
             for(int i = 0; i < 10; i++){
-                final EventData eventData = new EventData(String.format("test event number: %d",i).getBytes());
-                Whitebox.setInternalState(eventData,"isReceivedEvent",true);
-                Whitebox.setInternalState(eventData, "partitionKey","0");
-                Whitebox.setInternalState(eventData, "offset", "100");
-                Whitebox.setInternalState(eventData, "sequenceNumber",13L);
-                Whitebox.setInternalState(eventData, "enqueuedTime",Instant.now().minus(100L, ChronoUnit.SECONDS));
+                EventData eventData = EventData.create(String.format("test event number: %d", i).getBytes());
+                if (received) {
+                    HashMap<String, Object> properties = new HashMap<>();
+                    properties.put(AmqpConstants.PARTITION_KEY_ANNOTATION_NAME, PARTITION_KEY_VALUE);
+                    properties.put(AmqpConstants.OFFSET_ANNOTATION_NAME, OFFSET_VALUE);
+                    properties.put(AmqpConstants.SEQUENCE_NUMBER_ANNOTATION_NAME, SEQUENCE_NUMBER_VALUE);
+                    properties.put(AmqpConstants.ENQUEUED_TIME_UTC_ANNOTATION_NAME, ENQUEUED_TIME_VALUE);
+
+                    SystemProperties systemProperties = new SystemProperties(properties);
+                    eventData.setSystemProperties(systemProperties);
+                }
                 receivedEvents.add(eventData);
             }
 
             return receivedEvents;
-
         }
     }
 
     public static class MockGetAzureEventHubNoPartitions extends GetAzureEventHub{
-
-
         @Override
-        protected void setupReceiver(final String connectionString) throws ProcessException{
+        protected void setupReceiver(final String connectionString, final ScheduledExecutorService executor) throws ProcessException{
             //do nothing
         }
 
@@ -166,10 +178,10 @@ public class GetAzureEventHubTest {
         public void onScheduled(final ProcessContext context) throws ProcessException {
 
         }
+        @Override
+        public void tearDown() throws ProcessException {
+        }
     }
-
-
-
     private void setUpStandardTestConfig() {
         testRunner.setProperty(GetAzureEventHub.EVENT_HUB_NAME,eventHubName);
         testRunner.setProperty(GetAzureEventHub.NAMESPACE,namespaceName);
@@ -178,5 +190,4 @@ public class GetAzureEventHubTest {
         testRunner.setProperty(GetAzureEventHub.NUM_PARTITIONS,"4");
         testRunner.assertValid();
     }
-
 }
