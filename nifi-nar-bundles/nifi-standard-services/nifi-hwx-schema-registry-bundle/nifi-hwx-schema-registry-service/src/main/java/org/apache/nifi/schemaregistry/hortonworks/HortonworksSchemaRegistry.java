@@ -288,7 +288,7 @@ public class HortonworksSchemaRegistry extends AbstractControllerService impleme
                 .name(schemaName.get())
                 .branch(schemaBranchName.orElse(null))
                 .version(versionInfo.getVersion())
-                .protocol(schemaIdentifier.getProtocol())
+                .schemaVersionId(versionInfo.getId())
                 .build();
 
         final Tuple<SchemaIdentifier, String> tuple = new Tuple<>(resultSchemaIdentifier, schemaText);
@@ -339,7 +339,7 @@ public class HortonworksSchemaRegistry extends AbstractControllerService impleme
                 .name(schemaName)
                 .id(schemaId.getAsLong())
                 .version(version.getAsInt())
-                .protocol(schemaIdentifier.getProtocol())
+                .schemaVersionId(versionInfo.getId())
                 .build();
 
         final Tuple<SchemaIdentifier, String> tuple = new Tuple<>(resultSchemaIdentifier, schemaText);
@@ -384,7 +384,6 @@ public class HortonworksSchemaRegistry extends AbstractControllerService impleme
                 .id(versionInfo.getSchemaMetadataId())
                 .version(versionInfo.getVersion())
                 .schemaVersionId(schemaVersionId.getAsLong())
-                .protocol(schemaIdentifier.getProtocol())
                 .build();
 
         final Tuple<SchemaIdentifier, String> tuple = new Tuple<>(resultSchemaIdentifier, schemaText);
